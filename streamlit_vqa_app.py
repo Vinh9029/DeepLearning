@@ -7,6 +7,34 @@ import sys
 import pickle
 from pathlib import Path
 
+# Define the Vocab class that was used to create the pickle files.
+# This is necessary for pickle to be able to load the vocab objects.
+class Vocab:
+    """A simple vocabulary class to map tokens to indices and vice-versa."""
+    def __init__(self, itos, unk_token="<unk>"):
+        self.itos = itos
+        self.stoi = {s: i for i, s in enumerate(self.itos)}
+        self.unk_idx = self.stoi.get(unk_token)
+
+    def __len__(self):
+        return len(self.itos)
+
+    def tokenize(self, text):
+        # A simple whitespace tokenizer. This should match the one used during training.
+        return text.lower().strip().split()
+
+    def encode(self, text):
+        """Converts a text string to a list of token indices."""
+        tokens = self.tokenize(text)
+        # Lấy index của token <unk> một cách an toàn để tránh lỗi với pickle cũ
+        unk_index = getattr(self, 'unk_idx', self.stoi.get("<unk>", 3))
+        return [self.stoi.get(token, unk_index) for token in tokens]
+
+    def decode(self, ids):
+        """Converts a list of token indices to a text string."""
+        tokens = [self.itos[i] for i in ids if self.itos[i] not in ["<bos>", "<pad>"]]
+        return " ".join(tokens).split("<eos>")[0].strip()
+
 # ==== CONFIG ====
 KAGGLE_OUTPUT = Path(__file__).parent / "kaggle_output"
 MODELS_DIR = KAGGLE_OUTPUT / "models"
@@ -157,5 +185,5 @@ if st.session_state.vqa_history:
 
 st.markdown("""
 ---
-<sub>Vi-VQA Animal Demo | Đồ án Deep Learning 2026 | Streamlit UI by Copilot</sub>
+<sub>Vi-VQA Animal Demo | Đồ án Deep Learning 2026</sub>
 """)
