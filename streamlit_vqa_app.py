@@ -1,4 +1,5 @@
 import streamlit as st
+import random
 import torch
 from PIL import Image
 import numpy as np
@@ -6,6 +7,8 @@ import os
 import sys
 import pickle
 from pathlib import Path
+
+import random
 
 # Define the Vocab class that was used to create the pickle files.
 # This is necessary for pickle to be able to load the vocab objects.
@@ -134,6 +137,98 @@ if img_file:
     img = resolve_image(img_file)
     st.image(img, caption="Ảnh đã upload", use_column_width=True)
 
+
+# ==== PATTERN GENERATION ====
+def get_q_type(question):
+    """
+    Xác định loại câu hỏi (q_type) dựa trên từ khóa trong câu hỏi.
+    """
+    q = question.lower()
+    if any(x in q for x in ["con gì", "con nào", "loài gì", "loài nào", "animal", "what animal", "which animal", "who", "tên gì", "tên con"]):
+        return "Identity"
+    if any(x in q for x in ["màu gì", "màu sắc", "color", "what color"]):
+        return "Color"
+    if any(x in q for x in ["không", "phải không", "đúng không", "có phải", "yes", "no", "is it", "are they", "does it", "do they"]):
+        return "YesNooN"
+    if any(x in q for x in ["đang làm gì", "làm gì", "doing", "do", "what is", "what are", "hành động", "action"]):
+        return "Action"
+    if any(x in q for x in ["ở đâu", "môi trường", "sống ở", "environment", "where", "habitat", "đặc điểm", "details", "characteristic"]):
+        return "Environment"
+    return "Identity"  # fallback
+
+patterns_vi = {
+    "Identity": [
+        "Đây là {answer}.",
+        "Con vật trong hình là {answer}.",
+        "Đó là {answer}.",
+        "Tên con vật là {answer}."
+    ],
+    "Color": [
+        "Màu sắc của con vật là {answer}.",
+        "Con vật có màu {answer}.",
+        "{answer} là màu của con vật.",
+        "Con vật này mang màu {answer}."
+    ],
+    "YesNooN": [
+        "Câu trả lời là: {answer}.",
+        "{answer}.",
+        "Đúng vậy, {answer}.",
+        "Không, {answer}."
+    ],
+    "Action": [
+        "Con vật đang {answer}.",
+        "Hành động của con vật là {answer}.",
+        "Nó đang {answer}.",
+        "Con vật trong hình đang {answer}."
+    ],
+    "Environment": [
+        "Con vật đang ở {answer}.",
+        "Môi trường xung quanh là {answer}.",
+        "Đặc điểm môi trường: {answer}.",
+        "Con vật sống ở {answer}."
+    ]
+}
+patterns_en = {
+    "Identity": [
+        "This is a {answer}.",
+        "The animal in the picture is a {answer}.",
+        "It is a {answer}.",
+        "The animal's name is {answer}."
+    ],
+    "Color": [
+        "The animal's color is {answer}.",
+        "It is {answer} in color.",
+        "{answer} is the color of the animal.",
+        "The animal has a {answer} color."
+    ],
+    "YesNooN": [
+        "The answer is: {answer}.",
+        "{answer}.",
+        "Yes, {answer}.",
+        "No, {answer}."
+    ],
+    "Action": [
+        "The animal is {answer}.",
+        "Its action is {answer}.",
+        "It is {answer}.",
+        "The animal in the image is {answer}."
+    ],
+    "Environment": [
+        "The animal is in {answer}.",
+        "Its environment is {answer}.",
+        "The animal lives in {answer}.",
+        "Environment details: {answer}."
+    ]
+}
+
+def wrap_answer(answer, model_choice, question):
+    q_type = get_q_type(question)
+    if model_choice in ["A1 (LSTM)", "A2 (Transformer)"]:
+        pattern = random.choice(patterns_vi.get(q_type, patterns_vi["Identity"]))
+    else:
+        pattern = random.choice(patterns_en.get(q_type, patterns_en["Identity"]))
+    return pattern.format(answer=answer)
+
 if st.button("Trả lời", type="primary"):
     if not img_file or not question:
         st.warning("Vui lòng upload ảnh và nhập câu hỏi.")
@@ -165,7 +260,8 @@ if st.button("Trả lời", type="primary"):
         else:
             st.error(f"Không nhận diện được lựa chọn mô hình: {model_choice}")
             st.stop()
-    st.markdown(f"<div class='answer-box'><span class='big-font'>Đáp án: <b>{answer}</b></span></div>", unsafe_allow_html=True)
+    answer_sentence = make_full_sentence(answer, model_choice, question)
+    st.markdown(f"<div class='answer-box'><span class='big-font'>Đáp án: <b>{answer_sentence}</b></span></div>", unsafe_allow_html=True)
     st.success("Hoàn thành!")
     # Lưu lịch sử
     st.session_state.vqa_history.append({
